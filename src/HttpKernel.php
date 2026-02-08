@@ -2,6 +2,7 @@
 
 namespace Georgeff\HttpKernel;
 
+use Throwable;
 use Georgeff\Kernel\Kernel;
 use Georgeff\Kernel\KernelException;
 use Psr\Http\Message\ResponseInterface;
@@ -9,6 +10,8 @@ use Psr\Http\Server\MiddlewareInterface;
 use Laminas\Diactoros\ServerRequestFactory;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use Georgeff\HttpKernel\Exception\HttpExceptionInterface;
+use Georgeff\HttpKernel\Exception\InternalServerErrorHttpException;
 
 final class HttpKernel extends Kernel implements HttpKernelInterface
 {
@@ -25,6 +28,13 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
      * @var array<MiddlewareInterface|string>
      */
     protected array $middleware = [];
+
+    /**
+     * Exception handler
+     *
+     * @var null|callable(HttpExceptionInterface): ResponseInterface
+     */
+    protected $exceptionHandler = null;
 
     /**
      * @inheritdoc
@@ -74,11 +84,39 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
         /** @var RequestHandlerInterface $handler */
         $handler = $this->getContainer()->get(RequestHandlerInterface::class);
 
-        $response = $handler->handle($request);
+        try {
+            $response = $handler->handle($request);
+        } catch (Throwable $e) {
+            $this->dispatchKernelEvent(new Event\RequestErrored($this, $e, $request));
+
+            if (!$this->exceptionHandler) {
+                throw $e;
+            }
+
+            if (!$e instanceof HttpExceptionInterface) {
+                $e = new InternalServerErrorHttpException($request, $e->getMessage(), $e);
+            }
+
+            $response = ($this->exceptionHandler)($e);
+        }
 
         $this->dispatchKernelEvent(new Event\ResponseReady($this, $request, $response));
 
         return $response;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function withExceptionHandler(callable $handler): static
+    {
+        if ($this->isBooted()) {
+            throw new KernelException('Kernel has already booted, cannot register exception handler');
+        }
+
+        $this->exceptionHandler = $handler;
+
+        return $this;
     }
 
     /**

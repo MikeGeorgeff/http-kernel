@@ -8,6 +8,7 @@ use Psr\Http\Server\MiddlewareInterface;
 use Georgeff\Kernel\RunnableKernelInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Georgeff\HttpKernel\Exception\HttpExceptionInterface;
 
 interface HttpKernelInterface extends KernelInterface, RunnableKernelInterface, RequestHandlerInterface
 {
@@ -30,6 +31,15 @@ interface HttpKernelInterface extends KernelInterface, RunnableKernelInterface, 
      * @return static
      */
     public function addMiddleware(MiddlewareInterface|string $middleware): static;
+
+    /**
+     * Add an exception handler to the kernel
+     *
+     * @param callable(HttpExceptionInterface): ResponseInterface $handler
+     *
+     * @return static
+     */
+    public function withExceptionHandler(callable $handler): static;
 
     /**
      * Terminate a request/response cycle
