@@ -39,4 +39,21 @@ final class MethodNotAllowedHttpExceptionTest extends TestCase
 
         $this->assertSame(['GET', 'POST'], $exception->getAllowedMethods());
     }
+
+    public function test_code_matches_status_code(): void
+    {
+        $request = ServerRequestFactory::fromGlobals();
+        $exception = new MethodNotAllowedHttpException($request);
+
+        $this->assertSame(405, $exception->getCode());
+    }
+
+    public function test_previous_exception(): void
+    {
+        $request = ServerRequestFactory::fromGlobals();
+        $previous = new \RuntimeException('original');
+        $exception = new MethodNotAllowedHttpException($request, '', [], $previous);
+
+        $this->assertSame($previous, $exception->getPrevious());
+    }
 }

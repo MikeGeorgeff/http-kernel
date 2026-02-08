@@ -2,6 +2,7 @@
 
 namespace Georgeff\HttpKernel\Exception;
 
+use Throwable;
 use Psr\Http\Message\ServerRequestInterface;
 
 final class TooManyRequestsHttpException extends HttpException
@@ -12,12 +13,13 @@ final class TooManyRequestsHttpException extends HttpException
     public function __construct(
         ServerRequestInterface $request,
         string $message = '',
-        private readonly int|null $retryAfter = null
+        private readonly ?int $retryAfter = null,
+        ?Throwable $previous = null
     ) {
-        parent::__construct($request, $message);
+        parent::__construct($request, $message, $previous);
     }
 
-    public function getRetryAfter(): int|null
+    public function getRetryAfter(): ?int
     {
         return $this->retryAfter;
     }

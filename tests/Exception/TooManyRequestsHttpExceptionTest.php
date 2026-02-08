@@ -39,4 +39,21 @@ final class TooManyRequestsHttpExceptionTest extends TestCase
 
         $this->assertSame(120, $exception->getRetryAfter());
     }
+
+    public function test_code_matches_status_code(): void
+    {
+        $request = ServerRequestFactory::fromGlobals();
+        $exception = new TooManyRequestsHttpException($request);
+
+        $this->assertSame(429, $exception->getCode());
+    }
+
+    public function test_previous_exception(): void
+    {
+        $request = ServerRequestFactory::fromGlobals();
+        $previous = new \RuntimeException('original');
+        $exception = new TooManyRequestsHttpException($request, '', null, $previous);
+
+        $this->assertSame($previous, $exception->getPrevious());
+    }
 }

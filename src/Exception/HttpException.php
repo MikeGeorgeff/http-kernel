@@ -2,6 +2,7 @@
 
 namespace Georgeff\HttpKernel\Exception;
 
+use Throwable;
 use Psr\Http\Message\ServerRequestInterface;
 
 class HttpException extends \RuntimeException implements HttpExceptionInterface
@@ -12,9 +13,10 @@ class HttpException extends \RuntimeException implements HttpExceptionInterface
 
     public function __construct(
         private readonly ServerRequestInterface $request,
-        string $message = ''
+        string $message = '',
+        ?Throwable $previous = null
     ) {
-        parent::__construct($message);
+        parent::__construct($message, $this->status, $previous);
     }
 
     public function getRequest(): ServerRequestInterface
