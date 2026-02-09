@@ -50,7 +50,8 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
         }
 
         $this->addDefinition(EmitterInterface::class, fn() => new SapiEmitter(), true)
-             ->addDefinition(RequestHandlerInterface::class, new RequestHandlerFactory($this->middleware));
+             ->addDefinition(RequestHandlerInterface::class, new RequestHandlerFactory($this->middleware))
+             ->addDefinition(ServerRequestInterface::class, fn() => ServerRequestFactory::fromGlobals(), true);
 
         parent::boot();
     }
@@ -60,7 +61,8 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
      */
     public function run(): int
     {
-        $request = ServerRequestFactory::fromGlobals();
+        /** @var ServerRequestInterface $request */
+        $request = $this->getContainer()->get(ServerRequestInterface::class);
 
         $response = $this->handle($request);
 
