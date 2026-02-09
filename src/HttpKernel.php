@@ -37,6 +37,20 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
     protected $exceptionHandler = null;
 
     /**
+     * @var array{
+     *    'request.received': array<callable(HttpKernelInterface, ServerRequestInterface): void>,
+     *    'response.ready': array<callable(HttpKernelInterface, ServerRequestInterface, ResponseInterface): void>,
+     *    'request.errored': array<callable(HttpKernelInterface, Throwable, ServerRequestInterface): void>
+     * }
+     */
+    protected array $requestLifecycleCallbacks = ['request.received' => [], 'response.ready' => [], 'request.errored' => []];
+
+    /**
+     * @var array<callable(HttpKernelInterface, ServerRequestInterface, ResponseInterface): void>
+     */
+    protected array $terminatingCallbacks = [];
+
+    /**
      * @inheritdoc
      */
     public function boot(): void
@@ -81,7 +95,9 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
      */
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
-        $this->dispatchKernelEvent(new Event\RequestReceived($this, $request));
+        foreach ($this->requestLifecycleCallbacks['request.received'] as $requestReceived) {
+            $requestReceived($this, $request);
+        }
 
         /** @var RequestHandlerInterface $handler */
         $handler = $this->getContainer()->get(RequestHandlerInterface::class);
@@ -89,7 +105,9 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
         try {
             $response = $handler->handle($request);
         } catch (Throwable $e) {
-            $this->dispatchKernelEvent(new Event\RequestErrored($this, $e, $request));
+            foreach ($this->requestLifecycleCallbacks['request.errored'] as $requestErrored) {
+                $requestErrored($this, $e, $request);
+            }
 
             if (!$this->exceptionHandler) {
                 throw $e;
@@ -102,7 +120,9 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
             $response = ($this->exceptionHandler)($e);
         }
 
-        $this->dispatchKernelEvent(new Event\ResponseReady($this, $request, $response));
+        foreach ($this->requestLifecycleCallbacks['response.ready'] as $responseReady) {
+            $responseReady($this, $request, $response);
+        }
 
         return $response;
     }
@@ -124,9 +144,67 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
     /**
      * @inheritdoc
      */
+    public function onRequestReceived(callable $callback): static
+    {
+        if ($this->isBooted()) {
+            throw new KernelException('Kernel has already booted, callbacks can no longer be registered');
+        }
+
+        $this->requestLifecycleCallbacks['request.received'][] = $callback;
+
+        return $this;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function onResponseReady(callable $callback): static
+    {
+        if ($this->isBooted()) {
+            throw new KernelException('Kernel has already been booted, callbacks can no longer be registered');
+        }
+
+        $this->requestLifecycleCallbacks['response.ready'][] = $callback;
+
+        return $this;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function onRequestError(callable $callback): static
+    {
+        if ($this->isBooted()) {
+            throw new KernelException('Kernel has already been booted, callbacks can no longer be registered');
+        }
+
+        $this->requestLifecycleCallbacks['request.errored'][] = $callback;
+
+        return $this;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function onTermination(callable $callback): static
+    {
+        if ($this->isBooted()) {
+            throw new KernelException('Kernel has already been booted, callbacks can no longer be registered');
+        }
+
+        $this->terminatingCallbacks[] = $callback;
+
+        return $this;
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function terminate(ServerRequestInterface $request, ResponseInterface $response): void
     {
-        $this->dispatchKernelEvent(new Event\KernelTerminating($this, $request, $response));
+        foreach ($this->terminatingCallbacks as $callback) {
+            $callback($this, $request, $response);
+        }
     }
 
     /**

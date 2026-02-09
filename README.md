@@ -109,18 +109,29 @@ All extend `HttpException` and implement `HttpExceptionInterface`.
 
 `MethodNotAllowedHttpException` provides `getAllowedMethods()` and `TooManyRequestsHttpException` provides `getRetryAfter()`.
 
-## Events
+## Lifecycle Callbacks
 
-The kernel dispatches PSR-14 events during the request lifecycle:
+Register callbacks before boot to hook into the request lifecycle:
 
-| Event | When |
-|---|---|
-| `RequestReceived` | Start of `handle()` |
-| `ResponseReady` | After a response is produced |
-| `RequestErrored` | When an exception is caught in `handle()` |
-| `KernelTerminating` | During `terminate()`, after response emission |
+```php
+$kernel->onRequestReceived(function (HttpKernelInterface $kernel, ServerRequestInterface $request) {
+    // Runs at the start of handle()
+});
 
-Events require a `Psr\EventDispatcher\EventDispatcherInterface` passed to the kernel constructor.
+$kernel->onResponseReady(function (HttpKernelInterface $kernel, ServerRequestInterface $request, ResponseInterface $response) {
+    // Runs after a response is produced
+});
+
+$kernel->onRequestError(function (HttpKernelInterface $kernel, Throwable $exception, ServerRequestInterface $request) {
+    // Runs when an exception is caught in handle()
+});
+
+$kernel->onTermination(function (HttpKernelInterface $kernel, ServerRequestInterface $request, ResponseInterface $response) {
+    // Runs during terminate(), after response emission
+});
+```
+
+All callback registration methods must be called before `boot()` and return the kernel for fluent chaining.
 
 ## Response Helpers
 

@@ -3,10 +3,6 @@
 namespace Georgeff\HttpKernel\Test;
 
 use Georgeff\HttpKernel\EmitterInterface;
-use Georgeff\HttpKernel\Event\KernelTerminating;
-use Georgeff\HttpKernel\Event\RequestErrored;
-use Georgeff\HttpKernel\Event\RequestReceived;
-use Georgeff\HttpKernel\Event\ResponseReady;
 use Georgeff\HttpKernel\Exception\HttpExceptionInterface;
 use Georgeff\HttpKernel\Exception\InternalServerErrorHttpException;
 use Georgeff\HttpKernel\Exception\NotFoundHttpException;
@@ -18,11 +14,11 @@ use Georgeff\Kernel\KernelException;
 use Laminas\Diactoros\Response\TextResponse;
 use Laminas\Diactoros\ServerRequestFactory;
 use PHPUnit\Framework\TestCase;
-use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use Throwable;
 
 final class HttpKernelTest extends TestCase
 {
@@ -149,20 +145,29 @@ final class HttpKernelTest extends TestCase
         $this->assertSame($response, $result);
     }
 
-    public function test_handle_dispatches_request_received_event(): void
+    public function test_on_request_received_returns_kernel(): void
     {
-        /** @var list<object> $events */
-        $events = [];
+        $kernel = new HttpKernel(Environment::Testing);
 
-        $dispatcher = new class ($events) implements EventDispatcherInterface {
-            /** @param list<object> $events */
-            public function __construct(private array &$events) {}
-            public function dispatch(object $event): object
-            {
-                $this->events[] = $event;
-                return $event;
-            }
-        };
+        $result = $kernel->onRequestReceived(function () {});
+
+        $this->assertSame($kernel, $result);
+    }
+
+    public function test_on_request_received_after_boot_throws(): void
+    {
+        $kernel = new HttpKernel(Environment::Testing);
+        $kernel->boot();
+
+        $this->expectException(KernelException::class);
+
+        $kernel->onRequestReceived(function () {});
+    }
+
+    public function test_handle_invokes_request_received_callback(): void
+    {
+        /** @var ServerRequestInterface|null $captured */
+        $captured = null;
 
         $middleware = new class implements MiddlewareInterface {
             public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
@@ -171,32 +176,44 @@ final class HttpKernelTest extends TestCase
             }
         };
 
-        $kernel = new HttpKernel(Environment::Testing, dispatcher: $dispatcher);
+        $kernel = new HttpKernel(Environment::Testing);
         $kernel->addMiddleware($middleware);
+        $kernel->onRequestReceived(function (HttpKernelInterface $k, ServerRequestInterface $r) use (&$captured) {
+            $captured = $r;
+        });
         $kernel->boot();
 
         $request = ServerRequestFactory::fromGlobals();
         $kernel->handle($request);
 
-        $httpEvents = array_values(array_filter($events, fn($e) => $e instanceof RequestReceived));
-        $this->assertCount(1, $httpEvents);
-        $this->assertSame($request, $httpEvents[0]->request);
+        $this->assertSame($request, $captured);
     }
 
-    public function test_handle_dispatches_response_ready_event(): void
+    public function test_on_response_ready_returns_kernel(): void
     {
-        /** @var list<object> $events */
-        $events = [];
+        $kernel = new HttpKernel(Environment::Testing);
 
-        $dispatcher = new class ($events) implements EventDispatcherInterface {
-            /** @param list<object> $events */
-            public function __construct(private array &$events) {}
-            public function dispatch(object $event): object
-            {
-                $this->events[] = $event;
-                return $event;
-            }
-        };
+        $result = $kernel->onResponseReady(function () {});
+
+        $this->assertSame($kernel, $result);
+    }
+
+    public function test_on_response_ready_after_boot_throws(): void
+    {
+        $kernel = new HttpKernel(Environment::Testing);
+        $kernel->boot();
+
+        $this->expectException(KernelException::class);
+
+        $kernel->onResponseReady(function () {});
+    }
+
+    public function test_handle_invokes_response_ready_callback(): void
+    {
+        /** @var ServerRequestInterface|null $capturedRequest */
+        $capturedRequest = null;
+        /** @var ResponseInterface|null $capturedResponse */
+        $capturedResponse = null;
 
         $response = new TextResponse('ok');
 
@@ -208,17 +225,19 @@ final class HttpKernelTest extends TestCase
             }
         };
 
-        $kernel = new HttpKernel(Environment::Testing, dispatcher: $dispatcher);
+        $kernel = new HttpKernel(Environment::Testing);
         $kernel->addMiddleware($middleware);
+        $kernel->onResponseReady(function (HttpKernelInterface $k, ServerRequestInterface $r, ResponseInterface $res) use (&$capturedRequest, &$capturedResponse) {
+            $capturedRequest = $r;
+            $capturedResponse = $res;
+        });
         $kernel->boot();
 
         $request = ServerRequestFactory::fromGlobals();
         $kernel->handle($request);
 
-        $httpEvents = array_values(array_filter($events, fn($e) => $e instanceof ResponseReady));
-        $this->assertCount(1, $httpEvents);
-        $this->assertSame($request, $httpEvents[0]->request);
-        $this->assertSame($response, $httpEvents[0]->response);
+        $this->assertSame($request, $capturedRequest);
+        $this->assertSame($response, $capturedResponse);
     }
 
     public function test_handle_rethrows_exception_without_handler(): void
@@ -295,20 +314,29 @@ final class HttpKernelTest extends TestCase
         $this->assertSame('unexpected', $captured->getMessage());
     }
 
-    public function test_handle_dispatches_request_errored_event_on_exception(): void
+    public function test_on_request_error_returns_kernel(): void
     {
-        /** @var list<object> $events */
-        $events = [];
+        $kernel = new HttpKernel(Environment::Testing);
 
-        $dispatcher = new class ($events) implements EventDispatcherInterface {
-            /** @param list<object> $events */
-            public function __construct(private array &$events) {}
-            public function dispatch(object $event): object
-            {
-                $this->events[] = $event;
-                return $event;
-            }
-        };
+        $result = $kernel->onRequestError(function () {});
+
+        $this->assertSame($kernel, $result);
+    }
+
+    public function test_on_request_error_after_boot_throws(): void
+    {
+        $kernel = new HttpKernel(Environment::Testing);
+        $kernel->boot();
+
+        $this->expectException(KernelException::class);
+
+        $kernel->onRequestError(function () {});
+    }
+
+    public function test_handle_invokes_request_error_callback_on_exception(): void
+    {
+        /** @var Throwable|null $captured */
+        $captured = null;
 
         $original = new \RuntimeException('boom');
 
@@ -320,34 +348,50 @@ final class HttpKernelTest extends TestCase
             }
         };
 
-        $kernel = new HttpKernel(Environment::Testing, dispatcher: $dispatcher);
+        $kernel = new HttpKernel(Environment::Testing);
         $kernel->addMiddleware($middleware);
+        $kernel->onRequestError(function (HttpKernelInterface $k, Throwable $e) use (&$captured) {
+            $captured = $e;
+        });
         $kernel->withExceptionHandler(fn(HttpExceptionInterface $e) => new TextResponse('error'));
         $kernel->boot();
 
         $kernel->handle(ServerRequestFactory::fromGlobals());
 
-        $errorEvents = array_values(array_filter($events, fn($e) => $e instanceof RequestErrored));
-        $this->assertCount(1, $errorEvents);
-        $this->assertSame($original, $errorEvents[0]->exception);
+        $this->assertSame($original, $captured);
     }
 
-    public function test_terminate_dispatches_kernel_terminating_event(): void
+    public function test_on_termination_returns_kernel(): void
     {
-        /** @var list<object> $events */
-        $events = [];
+        $kernel = new HttpKernel(Environment::Testing);
 
-        $dispatcher = new class ($events) implements EventDispatcherInterface {
-            /** @param list<object> $events */
-            public function __construct(private array &$events) {}
-            public function dispatch(object $event): object
-            {
-                $this->events[] = $event;
-                return $event;
-            }
-        };
+        $result = $kernel->onTermination(function () {});
 
-        $kernel = new HttpKernel(Environment::Testing, dispatcher: $dispatcher);
+        $this->assertSame($kernel, $result);
+    }
+
+    public function test_on_termination_after_boot_throws(): void
+    {
+        $kernel = new HttpKernel(Environment::Testing);
+        $kernel->boot();
+
+        $this->expectException(KernelException::class);
+
+        $kernel->onTermination(function () {});
+    }
+
+    public function test_terminate_invokes_termination_callback(): void
+    {
+        /** @var ServerRequestInterface|null $capturedRequest */
+        $capturedRequest = null;
+        /** @var ResponseInterface|null $capturedResponse */
+        $capturedResponse = null;
+
+        $kernel = new HttpKernel(Environment::Testing);
+        $kernel->onTermination(function (HttpKernelInterface $k, ServerRequestInterface $r, ResponseInterface $res) use (&$capturedRequest, &$capturedResponse) {
+            $capturedRequest = $r;
+            $capturedResponse = $res;
+        });
         $kernel->boot();
 
         $request = ServerRequestFactory::fromGlobals();
@@ -355,10 +399,8 @@ final class HttpKernelTest extends TestCase
 
         $kernel->terminate($request, $response);
 
-        $termEvents = array_values(array_filter($events, fn($e) => $e instanceof KernelTerminating));
-        $this->assertCount(1, $termEvents);
-        $this->assertSame($request, $termEvents[0]->request);
-        $this->assertSame($response, $termEvents[0]->response);
+        $this->assertSame($request, $capturedRequest);
+        $this->assertSame($response, $capturedResponse);
     }
 
     public function test_run_handles_request_emits_response_and_returns_zero(): void
