@@ -73,6 +73,13 @@ final class RouteTest extends TestCase
         new Route([], '/users', 'UserHandler');
     }
 
+    public function test_it_normalizes_methods_to_uppercase(): void
+    {
+        $route = new Route(['get', 'Post'], '/users', 'UserHandler');
+
+        $this->assertSame(['GET', 'POST'], $route->getMethods());
+    }
+
     public function test_it_returns_empty_arguments_by_default(): void
     {
         $route = new Route(['GET'], '/users', 'UserHandler');

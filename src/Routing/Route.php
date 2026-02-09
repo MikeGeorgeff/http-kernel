@@ -40,7 +40,7 @@ final class Route implements RouteInterface
             throw new \InvalidArgumentException('Route methods cannot be empty');
         }
 
-        $this->methods = $methods;
+        $this->methods = array_map('strtoupper', $methods);
 
         if ($path === '' || $path[0] !== '/') {
             $path = '/' . $path;
