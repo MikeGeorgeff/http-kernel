@@ -43,42 +43,6 @@ interface HttpKernelInterface extends KernelInterface, RunnableKernelInterface, 
     public function withExceptionHandler(callable $handler): static;
 
     /**
-     * Register a callback to run when a request is received
-     *
-     * @param callable(HttpKernelInterface, ServerRequestInterface): void $callback
-     *
-     * @return static
-     */
-    public function onRequestReceived(callable $callback): static;
-
-    /**
-     * Register a callback to run when the response is ready
-     *
-     * @param callable(HttpKernelInterface, ServerRequestInterface, ResponseInterface): void $callback
-     *
-     * @return static
-     */
-    public function onResponseReady(callable $callback): static;
-
-    /**
-     * Register a callback to run when there is an error during the request/response life cycle
-     *
-     * @param callable(HttpKernelInterface, Throwable, ServerRequestInterface): void $callback
-     *
-     * @return static
-     */
-    public function onRequestError(callable $callback): static;
-
-    /**
-     * Register a callback to run when the kernel is terminating
-     *
-     * @param callable(HttpKernelInterface, ServerRequestInterface, ResponseInterface): void $callback
-     *
-     * @return static
-     */
-    public function onTermination(callable $callback): static;
-
-    /**
      * Terminate a request/response cycle
      *
      * @param \Psr\Http\Message\ServerRequestInterface $request
