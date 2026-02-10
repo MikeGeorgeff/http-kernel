@@ -41,17 +41,23 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
      */
     public function boot(): void
     {
-        if ([] !== $this->routes) {
-            $routerInterface = Routing\RouterInterface::class;
-
-            $this->addDefinition($routerInterface, new Routing\RouterFactory($this->routes), true);
-
-            $this->middleware[] = $routerInterface;
+        if ($this->isBooted()) {
+            return;
         }
 
-        $this->addDefinition(EmitterInterface::class, fn() => new SapiEmitter(), true)
-             ->addDefinition(RequestHandlerInterface::class, new RequestHandlerFactory($this->middleware))
-             ->addDefinition(ServerRequestInterface::class, fn() => ServerRequestFactory::fromGlobals(), true);
+        $this->onBooting(function (): void {
+            if ([] !== $this->routes) {
+                $routerInterface = Routing\RouterInterface::class;
+
+                $this->addDefinition($routerInterface, new Routing\RouterFactory($this->routes), true);
+
+                $this->middleware[] = $routerInterface;
+            }
+
+            $this->addDefinition(EmitterInterface::class, fn() => new SapiEmitter(), true)
+                 ->addDefinition(RequestHandlerInterface::class, new RequestHandlerFactory($this->middleware))
+                 ->addDefinition(ServerRequestInterface::class, fn() => ServerRequestFactory::fromGlobals(), true);
+        });
 
         parent::boot();
     }

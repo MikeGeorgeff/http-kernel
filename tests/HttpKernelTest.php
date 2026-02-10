@@ -458,4 +458,60 @@ final class HttpKernelTest extends TestCase
         $this->assertInstanceOf(RouteInterface::class, $route);
         $this->assertSame('/users', $route->getPath());
     }
+
+    public function test_boot_is_idempotent(): void
+    {
+        $kernel = new HttpKernel(Environment::Testing);
+        $kernel->boot();
+        $kernel->boot();
+
+        $this->assertTrue($kernel->isBooted());
+    }
+
+    public function test_middleware_added_in_pre_boot_callback_is_included(): void
+    {
+        $response = new TextResponse('from callback');
+
+        $middleware = new class ($response) implements MiddlewareInterface {
+            public function __construct(private ResponseInterface $response) {}
+            public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
+            {
+                return $this->response;
+            }
+        };
+
+        $kernel = new HttpKernel(Environment::Testing);
+        $kernel->onBooting(function () use ($kernel, $middleware): void {
+            $kernel->addMiddleware($middleware);
+        });
+        $kernel->boot();
+
+        $result = $kernel->handle(ServerRequestFactory::fromGlobals());
+
+        $this->assertSame($response, $result);
+    }
+
+    public function test_route_added_in_pre_boot_callback_is_included(): void
+    {
+        $handler = new class implements RequestHandlerInterface {
+            public function handle(ServerRequestInterface $request): ResponseInterface
+            {
+                return new TextResponse('callback route');
+            }
+        };
+
+        $kernel = new HttpKernel(Environment::Testing);
+        $kernel->onBooting(function () use ($kernel, $handler): void {
+            $kernel->addRoute('GET', '/callback', $handler);
+        });
+        $kernel->boot();
+
+        $request = ServerRequestFactory::fromGlobals(
+            ['REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/callback']
+        );
+
+        $response = $kernel->handle($request);
+
+        $this->assertSame('callback route', (string) $response->getBody());
+    }
 }
