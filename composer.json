@@ -1,6 +1,6 @@
 {
   "name": "georgeff/http-kernel",
-  "description": "HTTP kernel",
+  "description": "PSR-15 HTTP kernel.  Provides routing, a global middleware stack, per-route middleware, exception handling, and response emission",
   "type": "library",
   "authors": [
     {
