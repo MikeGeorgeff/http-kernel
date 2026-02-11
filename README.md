@@ -128,6 +128,40 @@ $kernel->addDefinition(EventDispatcherInterface::class, function () {
 
 All events extend `Georgeff\Kernel\Event\KernelEvent` and carry the kernel instance along with relevant request, response, or exception data as readonly public properties.
 
+## Debugging
+
+Enable debug mode to profile the request lifecycle. Pass `debug: true` to the kernel constructor:
+
+```php
+$kernel = new HttpKernel(Environment::Development, debug: true);
+```
+
+When debug mode is enabled, the kernel profiles the following phases:
+
+| Phase | Description |
+|---|---|
+| `requestResolution` | Resolving the `ServerRequestInterface` from the container |
+| `handle` | Total time spent in `handle()` |
+| `middleware` | Executing the middleware pipeline |
+| `exceptionHandling` | Running the exception handler (only when an exception occurs) |
+| `emission` | Emitting the response |
+| `terminate` | Running termination logic |
+
+The `requestResolution`, `emission`, and `terminate` phases are only recorded when using `run()`. When calling `handle()` directly, only `handle`, `middleware`, and `exceptionHandling` (if applicable) are recorded.
+
+Retrieve profiling data via `getDebugInfo()`:
+
+```php
+$info = $kernel->getDebugInfo();
+
+// Boot profile from the parent kernel
+$info['bootProfile'];
+
+// Request lifecycle profile
+$info['requestProfile']['duration'];
+$info['requestProfile']['phases']['middleware']['duration'];
+```
+
 ## Response Helpers
 
 Convenience response classes under `Georgeff\HttpKernel\Response`:

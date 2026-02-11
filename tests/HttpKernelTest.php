@@ -123,6 +123,24 @@ final class HttpKernelTest extends TestCase
         $kernel->withExceptionHandler(fn(HttpExceptionInterface $e) => new TextResponse('error'));
     }
 
+    public function test_run_before_boot_throws(): void
+    {
+        $kernel = new HttpKernel(Environment::Testing);
+
+        $this->expectException(KernelException::class);
+
+        $kernel->run();
+    }
+
+    public function test_handle_before_boot_throws(): void
+    {
+        $kernel = new HttpKernel(Environment::Testing);
+
+        $this->expectException(KernelException::class);
+
+        $kernel->handle(ServerRequestFactory::fromGlobals());
+    }
+
     public function test_handle_returns_response_from_middleware(): void
     {
         $response = new TextResponse('hello');
@@ -489,6 +507,160 @@ final class HttpKernelTest extends TestCase
         $result = $kernel->handle(ServerRequestFactory::fromGlobals());
 
         $this->assertSame($response, $result);
+    }
+
+    public function test_get_debug_info_returns_empty_when_debug_is_off(): void
+    {
+        $middleware = new class implements MiddlewareInterface {
+            public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
+            {
+                return new TextResponse('ok');
+            }
+        };
+
+        $kernel = new HttpKernel(Environment::Testing);
+        $kernel->addMiddleware($middleware);
+        $kernel->boot();
+
+        $kernel->handle(ServerRequestFactory::fromGlobals());
+
+        $this->assertSame([], $kernel->getDebugInfo());
+    }
+
+    public function test_get_debug_info_includes_request_profile_after_handle(): void
+    {
+        $middleware = new class implements MiddlewareInterface {
+            public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
+            {
+                return new TextResponse('ok');
+            }
+        };
+
+        $kernel = new HttpKernel(Environment::Testing, debug: true);
+        $kernel->addMiddleware($middleware);
+        $kernel->boot();
+
+        $kernel->handle(ServerRequestFactory::fromGlobals());
+
+        $info = $kernel->getDebugInfo();
+
+        $this->assertArrayHasKey('requestProfile', $info);
+        $this->assertArrayHasKey('phases', $info['requestProfile']);
+        $this->assertArrayHasKey('handle', $info['requestProfile']['phases']);
+        $this->assertArrayHasKey('middleware', $info['requestProfile']['phases']);
+    }
+
+    public function test_get_debug_info_includes_all_phases_after_run(): void
+    {
+        $middleware = new class implements MiddlewareInterface {
+            public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
+            {
+                return new TextResponse('ok');
+            }
+        };
+
+        $kernel = new HttpKernel(Environment::Testing, debug: true);
+        $kernel->addMiddleware($middleware);
+        $kernel->boot();
+
+        ob_start();
+        $kernel->run();
+        ob_get_clean();
+
+        $phases = $kernel->getDebugInfo()['requestProfile']['phases'];
+
+        $this->assertArrayHasKey('requestResolution', $phases);
+        $this->assertArrayHasKey('handle', $phases);
+        $this->assertArrayHasKey('middleware', $phases);
+        $this->assertArrayHasKey('emission', $phases);
+        $this->assertArrayHasKey('terminate', $phases);
+    }
+
+    public function test_request_profile_records_exception_handling_phase(): void
+    {
+        $middleware = new class implements MiddlewareInterface {
+            public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
+            {
+                throw new NotFoundHttpException($request, 'not here');
+            }
+        };
+
+        $kernel = new HttpKernel(Environment::Testing, debug: true);
+        $kernel->addMiddleware($middleware);
+        $kernel->withExceptionHandler(fn(HttpExceptionInterface $e) => new TextResponse('error', $e->getStatusCode()));
+        $kernel->boot();
+
+        $kernel->handle(ServerRequestFactory::fromGlobals());
+
+        $phases = $kernel->getDebugInfo()['requestProfile']['phases'];
+
+        $this->assertArrayHasKey('exceptionHandling', $phases);
+    }
+
+    public function test_request_profile_captures_timing_on_rethrow(): void
+    {
+        $middleware = new class implements MiddlewareInterface {
+            public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
+            {
+                throw new \RuntimeException('boom');
+            }
+        };
+
+        $kernel = new HttpKernel(Environment::Testing, debug: true);
+        $kernel->addMiddleware($middleware);
+        $kernel->boot();
+
+        try {
+            $kernel->handle(ServerRequestFactory::fromGlobals());
+        } catch (\RuntimeException) {
+        }
+
+        $phases = $kernel->getDebugInfo()['requestProfile']['phases'];
+
+        $this->assertArrayHasKey('handle', $phases);
+        $this->assertArrayHasKey('middleware', $phases);
+        $this->assertArrayNotHasKey('exceptionHandling', $phases);
+    }
+
+    public function test_get_debug_info_merges_boot_and_request_profiles(): void
+    {
+        $middleware = new class implements MiddlewareInterface {
+            public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
+            {
+                return new TextResponse('ok');
+            }
+        };
+
+        $kernel = new HttpKernel(Environment::Testing, debug: true);
+        $kernel->addMiddleware($middleware);
+        $kernel->boot();
+
+        $kernel->handle(ServerRequestFactory::fromGlobals());
+
+        $info = $kernel->getDebugInfo();
+
+        $this->assertArrayHasKey('bootProfile', $info);
+        $this->assertArrayHasKey('requestProfile', $info);
+    }
+
+    public function test_handle_standalone_stops_profiler(): void
+    {
+        $middleware = new class implements MiddlewareInterface {
+            public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
+            {
+                return new TextResponse('ok');
+            }
+        };
+
+        $kernel = new HttpKernel(Environment::Testing, debug: true);
+        $kernel->addMiddleware($middleware);
+        $kernel->boot();
+
+        $kernel->handle(ServerRequestFactory::fromGlobals());
+
+        $requestProfile = $kernel->getDebugInfo()['requestProfile'];
+
+        $this->assertGreaterThanOrEqual(0, $requestProfile['duration']);
     }
 
     public function test_route_added_in_pre_boot_callback_is_included(): void
