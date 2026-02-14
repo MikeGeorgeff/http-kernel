@@ -2,7 +2,6 @@
 
 namespace Georgeff\HttpKernel;
 
-use Throwable;
 use Georgeff\Kernel\KernelInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Server\MiddlewareInterface;
@@ -51,4 +50,11 @@ interface HttpKernelInterface extends KernelInterface, RunnableKernelInterface, 
      * @return void
      */
     public function terminate(ServerRequestInterface $request, ResponseInterface $response): void;
+
+    /**
+     * Shutdown the kernel
+     *
+     * @return void
+     */
+    public function shutdown(): void;
 }

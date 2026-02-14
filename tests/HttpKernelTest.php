@@ -663,6 +663,74 @@ final class HttpKernelTest extends TestCase
         $this->assertGreaterThanOrEqual(0, $requestProfile['duration']);
     }
 
+    public function test_shutdown_dispatches_kernel_shutdown_event(): void
+    {
+        /** @var list<object> $events */
+        $events = [];
+
+        $dispatcher = new class ($events) implements EventDispatcherInterface {
+            /** @param list<object> $events */
+            public function __construct(private array &$events) {}
+            public function dispatch(object $event): object
+            {
+                $this->events[] = $event;
+                return $event;
+            }
+        };
+
+        $kernel = new HttpKernel(Environment::Testing);
+        $kernel->addDefinition(EventDispatcherInterface::class, fn() => $dispatcher);
+        $kernel->boot();
+
+        $kernel->shutdown();
+
+        $shutdownEvents = array_values(array_filter($events, fn($e) => $e instanceof Event\KernelShutdown));
+        $this->assertCount(1, $shutdownEvents);
+        $this->assertSame($kernel, $shutdownEvents[0]->kernel);
+    }
+
+    public function test_shutdown_is_noop_when_not_booted(): void
+    {
+        $kernel = new HttpKernel(Environment::Testing);
+
+        $kernel->shutdown();
+
+        $this->assertFalse($kernel->isBooted());
+    }
+
+    public function test_boot_after_shutdown_throws(): void
+    {
+        $kernel = new HttpKernel(Environment::Testing);
+        $kernel->boot();
+        $kernel->shutdown();
+
+        $this->expectException(KernelException::class);
+
+        $kernel->boot();
+    }
+
+    public function test_handle_after_shutdown_throws(): void
+    {
+        $kernel = new HttpKernel(Environment::Testing);
+        $kernel->boot();
+        $kernel->shutdown();
+
+        $this->expectException(KernelException::class);
+
+        $kernel->handle(ServerRequestFactory::fromGlobals());
+    }
+
+    public function test_run_after_shutdown_throws(): void
+    {
+        $kernel = new HttpKernel(Environment::Testing);
+        $kernel->boot();
+        $kernel->shutdown();
+
+        $this->expectException(KernelException::class);
+
+        $kernel->run();
+    }
+
     public function test_route_added_in_pre_boot_callback_is_included(): void
     {
         $handler = new class implements RequestHandlerInterface {

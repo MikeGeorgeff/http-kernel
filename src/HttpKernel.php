@@ -16,6 +16,8 @@ use Georgeff\HttpKernel\Exception\InternalServerErrorHttpException;
 
 final class HttpKernel extends Kernel implements HttpKernelInterface
 {
+    private bool $shutdown = false;
+
     private ?Profiler $requestProfile = null;
 
     /**
@@ -51,10 +53,42 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
     }
 
     /**
+     * @throws \Georgeff\Kernel\KernelException
+     */
+    private function throwIfBooted(string $message): void
+    {
+        if ($this->isBooted()) {
+            throw new KernelException($message);
+        }
+    }
+
+    /**
+     * @throws \Georgeff\Kernel\KernelException
+     */
+    private function throwIfNotBooted(string $message): void
+    {
+        if (!$this->isBooted()) {
+            throw new KernelException($message);
+        }
+    }
+
+    /**
+     * @throws \Georgeff\Kernel\KernelException
+     */
+    private function throwIfShutdown(): void
+    {
+        if ($this->shutdown) {
+            throw new KernelException('Kernel is shutdown');
+        }
+    }
+
+    /**
      * @inheritdoc
      */
     public function boot(): void
     {
+        $this->throwIfShutdown();
+
         if ($this->isBooted()) {
             return;
         }
@@ -81,9 +115,9 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
      */
     public function run(): int
     {
-        if (!$this->isBooted()) {
-            throw new KernelException('Kernel cannot run because it has not been booted');
-        }
+        $this->throwIfShutdown();
+
+        $this->throwIfNotBooted('Kernel cannot run because it has not been booted');
 
         $this->initRequestProfile();
 
@@ -117,9 +151,9 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
      */
     public function handle(ServerRequestInterface $request): ResponseInterface
     {
-        if (!$this->isBooted()) {
-            throw new KernelException('Kernel cannot handle requests because it has not been booted');
-        }
+        $this->throwIfShutdown();
+
+        $this->throwIfNotBooted('Kernel cannot handle requests because it has not been booted');
 
         $ownsProfile = null === $this->requestProfile;
 
@@ -182,9 +216,7 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
      */
     public function withExceptionHandler(callable $handler): static
     {
-        if ($this->isBooted()) {
-            throw new KernelException('Kernel has already booted, cannot register exception handler');
-        }
+        $this->throwIfBooted('Kernel has already booted, cannot register exception handler');
 
         $this->exceptionHandler = $handler;
 
@@ -208,9 +240,7 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
      */
     public function addRoute(array|string $methods, string $uri, RequestHandlerInterface|string $handler): Routing\RouteInterface
     {
-        if ($this->isBooted()) {
-            throw new KernelException('Kernel has already booted, cannot add new routes');
-        }
+        $this->throwIfBooted('Kernel has already booted, cannot add new routes');
 
         $methods = is_string($methods) ? [$methods] : array_values($methods);
 
@@ -222,13 +252,25 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
      */
     public function addMiddleware(MiddlewareInterface|string $middleware): static
     {
-        if ($this->isBooted()) {
-            throw new KernelException('Kernel has already been booted, cannot modify the global middleware stack');
-        }
+        $this->throwIfBooted('Kernel has already been booted, cannot modify the global middleware stack');
 
         $this->middleware[] = $middleware;
 
         return $this;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function shutdown(): void
+    {
+        if (!$this->isBooted()) {
+            return;
+        }
+
+        $this->dispatchKernelEvent(new Event\KernelShutdown($this));
+
+        $this->shutdown = true;
     }
 
     /**
