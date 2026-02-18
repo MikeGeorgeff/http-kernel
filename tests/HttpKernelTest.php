@@ -4,7 +4,6 @@ namespace Georgeff\HttpKernel\Test;
 
 use Georgeff\HttpKernel\Event;
 use Georgeff\HttpKernel\Exception\HttpExceptionInterface;
-use Georgeff\HttpKernel\Exception\InternalServerErrorHttpException;
 use Georgeff\HttpKernel\Exception\NotFoundHttpException;
 use Georgeff\HttpKernel\HttpKernel;
 use Georgeff\HttpKernel\HttpKernelInterface;
@@ -108,7 +107,7 @@ final class HttpKernelTest extends TestCase
     {
         $kernel = new HttpKernel(Environment::Testing);
 
-        $result = $kernel->withExceptionHandler(fn(HttpExceptionInterface $e) => new TextResponse('error'));
+        $result = $kernel->withExceptionHandler(fn(\Throwable $e) => new TextResponse('error'));
 
         $this->assertSame($kernel, $result);
     }
@@ -120,7 +119,7 @@ final class HttpKernelTest extends TestCase
 
         $this->expectException(KernelException::class);
 
-        $kernel->withExceptionHandler(fn(HttpExceptionInterface $e) => new TextResponse('error'));
+        $kernel->withExceptionHandler(fn(\Throwable $e) => new TextResponse('error'));
     }
 
     public function test_run_before_boot_throws(): void
@@ -284,34 +283,6 @@ final class HttpKernelTest extends TestCase
         $this->assertSame(404, $response->getStatusCode());
     }
 
-    public function test_handle_wraps_non_http_exception_in_internal_server_error(): void
-    {
-        /** @var HttpExceptionInterface|null $captured */
-        $captured = null;
-
-        $middleware = new class implements MiddlewareInterface {
-            public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
-            {
-                throw new \RuntimeException('unexpected');
-            }
-        };
-
-        $kernel = new HttpKernel(Environment::Testing);
-        $kernel->addMiddleware($middleware);
-        $kernel->withExceptionHandler(function (HttpExceptionInterface $e) use (&$captured) {
-            $captured = $e;
-            return new TextResponse('error', $e->getStatusCode());
-        });
-        $kernel->boot();
-
-        $response = $kernel->handle(ServerRequestFactory::fromGlobals());
-
-        $this->assertNotNull($captured);
-        $this->assertInstanceOf(InternalServerErrorHttpException::class, $captured);
-        $this->assertSame(500, $response->getStatusCode());
-        $this->assertSame('unexpected', $captured->getMessage());
-    }
-
     public function test_handle_dispatches_request_errored_event_on_exception(): void
     {
         /** @var list<object> $events */
@@ -340,7 +311,7 @@ final class HttpKernelTest extends TestCase
         $kernel = new HttpKernel(Environment::Testing);
         $kernel->addDefinition(EventDispatcherInterface::class, fn() => $dispatcher);
         $kernel->addMiddleware($middleware);
-        $kernel->withExceptionHandler(fn(HttpExceptionInterface $e) => new TextResponse('error'));
+        $kernel->withExceptionHandler(fn(\Throwable $e) => new TextResponse('error'));
         $kernel->boot();
 
         $kernel->handle(ServerRequestFactory::fromGlobals());
@@ -587,7 +558,7 @@ final class HttpKernelTest extends TestCase
 
         $kernel = new HttpKernel(Environment::Testing, debug: true);
         $kernel->addMiddleware($middleware);
-        $kernel->withExceptionHandler(fn(HttpExceptionInterface $e) => new TextResponse('error', $e->getStatusCode()));
+        $kernel->withExceptionHandler(fn(\Throwable $e) => new TextResponse('error', $e instanceof HttpExceptionInterface ? $e->getStatusCode() : 500));
         $kernel->boot();
 
         $kernel->handle(ServerRequestFactory::fromGlobals());

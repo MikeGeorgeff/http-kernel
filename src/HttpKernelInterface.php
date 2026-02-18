@@ -2,13 +2,13 @@
 
 namespace Georgeff\HttpKernel;
 
+use Throwable;
 use Georgeff\Kernel\KernelInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Georgeff\Kernel\RunnableKernelInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use Georgeff\HttpKernel\Exception\HttpExceptionInterface;
 
 interface HttpKernelInterface extends KernelInterface, RunnableKernelInterface, RequestHandlerInterface
 {
@@ -35,7 +35,7 @@ interface HttpKernelInterface extends KernelInterface, RunnableKernelInterface, 
     /**
      * Add an exception handler to the kernel
      *
-     * @param callable(HttpExceptionInterface): ResponseInterface $handler
+     * @param callable(Throwable): ResponseInterface $handler
      *
      * @return static
      */

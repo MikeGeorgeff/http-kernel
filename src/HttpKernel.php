@@ -11,8 +11,6 @@ use Psr\Http\Server\MiddlewareInterface;
 use Laminas\Diactoros\ServerRequestFactory;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
-use Georgeff\HttpKernel\Exception\HttpExceptionInterface;
-use Georgeff\HttpKernel\Exception\InternalServerErrorHttpException;
 
 final class HttpKernel extends Kernel implements HttpKernelInterface
 {
@@ -37,7 +35,7 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
     /**
      * Exception handler
      *
-     * @var null|callable(HttpExceptionInterface): ResponseInterface
+     * @var null|callable(Throwable): ResponseInterface
      */
     protected $exceptionHandler = null;
 
@@ -187,10 +185,6 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
                 }
 
                 throw $e;
-            }
-
-            if (!$e instanceof HttpExceptionInterface) {
-                $e = new InternalServerErrorHttpException($request, $e->getMessage(), $e);
             }
 
             $this->requestProfile?->startPhase('exceptionHandling');
