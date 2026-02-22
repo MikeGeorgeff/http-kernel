@@ -107,7 +107,7 @@ final class HttpKernelTest extends TestCase
     {
         $kernel = new HttpKernel(Environment::Testing);
 
-        $result = $kernel->withExceptionHandler(fn(\Throwable $e) => new TextResponse('error'));
+        $result = $kernel->withExceptionHandler(fn(\Throwable $e, ServerRequestInterface $request) => new TextResponse('error'));
 
         $this->assertSame($kernel, $result);
     }
@@ -119,7 +119,7 @@ final class HttpKernelTest extends TestCase
 
         $this->expectException(KernelException::class);
 
-        $kernel->withExceptionHandler(fn(\Throwable $e) => new TextResponse('error'));
+        $kernel->withExceptionHandler(fn(\Throwable $e, ServerRequestInterface $request) => new TextResponse('error'));
     }
 
     public function test_run_before_boot_throws(): void
@@ -270,7 +270,7 @@ final class HttpKernelTest extends TestCase
 
         $kernel = new HttpKernel(Environment::Testing);
         $kernel->addMiddleware($middleware);
-        $kernel->withExceptionHandler(function (HttpExceptionInterface $e) use (&$captured) {
+        $kernel->withExceptionHandler(function (HttpExceptionInterface $e, ServerRequestInterface $request) use (&$captured) {
             $captured = $e;
             return new TextResponse('handled', $e->getStatusCode());
         });
@@ -311,7 +311,7 @@ final class HttpKernelTest extends TestCase
         $kernel = new HttpKernel(Environment::Testing);
         $kernel->addDefinition(EventDispatcherInterface::class, fn() => $dispatcher);
         $kernel->addMiddleware($middleware);
-        $kernel->withExceptionHandler(fn(\Throwable $e) => new TextResponse('error'));
+        $kernel->withExceptionHandler(fn(\Throwable $e, ServerRequestInterface $request) => new TextResponse('error'));
         $kernel->boot();
 
         $kernel->handle(ServerRequestFactory::fromGlobals());
@@ -558,7 +558,7 @@ final class HttpKernelTest extends TestCase
 
         $kernel = new HttpKernel(Environment::Testing, debug: true);
         $kernel->addMiddleware($middleware);
-        $kernel->withExceptionHandler(fn(\Throwable $e) => new TextResponse('error', $e instanceof HttpExceptionInterface ? $e->getStatusCode() : 500));
+        $kernel->withExceptionHandler(fn(\Throwable $e, ServerRequestInterface $request) => new TextResponse('error', $e instanceof HttpExceptionInterface ? $e->getStatusCode() : 500));
         $kernel->boot();
 
         $kernel->handle(ServerRequestFactory::fromGlobals());

@@ -35,7 +35,7 @@ interface HttpKernelInterface extends KernelInterface, RunnableKernelInterface, 
     /**
      * Add an exception handler to the kernel
      *
-     * @param callable(Throwable): ResponseInterface $handler
+     * @param callable(Throwable, ServerRequestInterface): ResponseInterface $handler
      *
      * @return static
      */

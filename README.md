@@ -20,7 +20,7 @@ $kernel->addMiddleware(SessionMiddleware::class);
 
 $kernel->addRoute('GET', '/users/{id}', UserHandler::class);
 
-$kernel->withExceptionHandler(function (Throwable $e) {
+$kernel->withExceptionHandler(function (Throwable $e, ServerRequestInterface $request) {
     $status = $e instanceof HttpExceptionInterface ? $e->getStatusCode() : 500;
     return new JsonResponse([
         'error' => $e->getMessage(),
@@ -76,7 +76,7 @@ Middleware can be a `MiddlewareInterface` instance or a string service ID resolv
 Register an exception handler to convert exceptions into HTTP responses. Without a handler, exceptions are rethrown. The handler receives the raw `Throwable` — check `instanceof HttpExceptionInterface` for HTTP-specific data.
 
 ```php
-$kernel->withExceptionHandler(function (Throwable $e) {
+$kernel->withExceptionHandler(function (Throwable $e, ServerRequestInterface $request) {
     $status = $e instanceof HttpExceptionInterface ? $e->getStatusCode() : 500;
     return new JsonResponse([
         'error' => $e->getMessage(),

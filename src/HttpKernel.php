@@ -35,7 +35,7 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
     /**
      * Exception handler
      *
-     * @var null|callable(Throwable): ResponseInterface
+     * @var null|callable(Throwable, ServerRequestInterface): ResponseInterface
      */
     protected $exceptionHandler = null;
 
@@ -189,7 +189,7 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
 
             $this->requestProfile?->startPhase('exceptionHandling');
 
-            $response = ($this->exceptionHandler)($e);
+            $response = ($this->exceptionHandler)($e, $request);
 
             $this->requestProfile?->stopPhase('exceptionHandling');
         }
