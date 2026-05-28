@@ -11,6 +11,7 @@ use Psr\Http\Server\MiddlewareInterface;
 use Laminas\Diactoros\ServerRequestFactory;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
+use Georgeff\HttpKernel\Routing\RouteInterface;
 
 final class HttpKernel extends Kernel implements HttpKernelInterface
 {
@@ -95,7 +96,14 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
             if ([] !== $this->routes) {
                 $routerInterface = Routing\RouterInterface::class;
 
-                $this->addDefinition($routerInterface, new Routing\RouterFactory($this->routes), true);
+                $routes = &$this->routes;
+
+                /** @var \Closure(): RouteInterface[] $routeCallable */
+                $routeCallable = static function () use (&$routes) {
+                    return $routes;
+                };
+
+                $this->addDefinition($routerInterface, new Routing\RouterFactory($routeCallable), true);
 
                 $this->middleware[] = $routerInterface;
             }

@@ -17,7 +17,7 @@ final class RouterFactoryTest extends TestCase
 {
     public function test_it_creates_router_interface_instance(): void
     {
-        $factory = new RouterFactory([]);
+        $factory = new RouterFactory(static fn() => []);
 
         $router = $factory($this->createEmptyContainer());
 
@@ -38,7 +38,7 @@ final class RouterFactoryTest extends TestCase
 
         $route = new Route(['GET'], '/users', $handler);
 
-        $factory = new RouterFactory([$route]);
+        $factory = new RouterFactory(static fn() => [$route]);
 
         $router = $factory($this->createEmptyContainer());
 
@@ -78,7 +78,7 @@ final class RouterFactoryTest extends TestCase
             public function has(string $id): bool { return true; }
         };
 
-        $factory = new RouterFactory([$route]);
+        $factory = new RouterFactory(static fn() => [$route]);
         $router = $factory($container);
 
         $request = ServerRequestFactory::fromGlobals(
@@ -113,7 +113,7 @@ final class RouterFactoryTest extends TestCase
 
         $route = new Route(['GET'], '/users/{id}', $handler);
 
-        $factory = new RouterFactory([$route]);
+        $factory = new RouterFactory(static fn() => [$route]);
         $router = $factory($this->createEmptyContainer());
 
         $request = ServerRequestFactory::fromGlobals(
@@ -134,6 +134,44 @@ final class RouterFactoryTest extends TestCase
         $routeAttr = $capturedRequest->getAttribute('__route__');
 
         $this->assertSame('42', $routeAttr->getArgument('id'));
+    }
+
+    public function test_routes_are_evaluated_lazily(): void
+    {
+        $response = new TextResponse('lazy');
+
+        $handler = new class ($response) implements RequestHandlerInterface {
+            public function __construct(private ResponseInterface $response) {}
+            public function handle(ServerRequestInterface $request): ResponseInterface
+            {
+                return $this->response;
+            }
+        };
+
+        $routes = [];
+
+        $factory = new RouterFactory(static function () use (&$routes) {
+            return $routes;
+        });
+
+        $routes[] = new Route(['GET'], '/lazy', $handler);
+
+        $router = $factory($this->createEmptyContainer());
+
+        $request = ServerRequestFactory::fromGlobals(
+            ['REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/lazy']
+        );
+
+        $fallback = new class implements RequestHandlerInterface {
+            public function handle(ServerRequestInterface $request): ResponseInterface
+            {
+                throw new \RuntimeException('Fallback handler should not be called');
+            }
+        };
+
+        $result = $router->process($request, $fallback);
+
+        $this->assertSame($response, $result);
     }
 
     private function createEmptyContainer(): ContainerInterface
