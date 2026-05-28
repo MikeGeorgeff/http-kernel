@@ -23,7 +23,7 @@ final class RequestHandlerFactoryTest extends TestCase
             }
         };
 
-        $factory = new RequestHandlerFactory([$middleware]);
+        $factory = new RequestHandlerFactory(static fn() => [$middleware]);
 
         $container = new class implements ContainerInterface {
             public function get(string $id): mixed { throw new \RuntimeException('no'); }
@@ -44,7 +44,7 @@ final class RequestHandlerFactoryTest extends TestCase
             }
         };
 
-        $factory = new RequestHandlerFactory([$middleware]);
+        $factory = new RequestHandlerFactory(static fn() => [$middleware]);
 
         $container = new class implements ContainerInterface {
             public function get(string $id): mixed { throw new \RuntimeException('no'); }
@@ -58,6 +58,35 @@ final class RequestHandlerFactoryTest extends TestCase
         $this->assertSame('from middleware', (string) $response->getBody());
     }
 
+    public function test_stack_is_evaluated_lazily(): void
+    {
+        $middleware = new class implements MiddlewareInterface {
+            public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
+            {
+                return new TextResponse('lazy');
+            }
+        };
+
+        $stack = [];
+
+        $factory = new RequestHandlerFactory(static function () use (&$stack) {
+            return $stack;
+        });
+
+        $stack[] = $middleware;
+
+        $container = new class implements ContainerInterface {
+            public function get(string $id): mixed { throw new \RuntimeException('no'); }
+            public function has(string $id): bool { return false; }
+        };
+
+        $handler = $factory($container);
+        $request = ServerRequestFactory::fromGlobals();
+        $response = $handler->handle($request);
+
+        $this->assertSame('lazy', (string) $response->getBody());
+    }
+
     public function test_handler_resolves_string_middleware_from_container(): void
     {
         $middleware = new class implements MiddlewareInterface {
@@ -67,7 +96,7 @@ final class RequestHandlerFactoryTest extends TestCase
             }
         };
 
-        $factory = new RequestHandlerFactory(['app.middleware']);
+        $factory = new RequestHandlerFactory(static fn() => ['app.middleware']);
 
         $container = new class ($middleware) implements ContainerInterface {
             public function __construct(private MiddlewareInterface $middleware) {}
