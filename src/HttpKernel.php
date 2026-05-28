@@ -93,26 +93,22 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
         }
 
         $this->onBooting(function (): void {
-            if ([] !== $this->routes) {
-                $routerInterface = Routing\RouterInterface::class;
+            $routerInterface = Routing\RouterInterface::class;
 
-                $routes = &$this->routes;
+            $routes = &$this->routes;
 
-                /** @var \Closure(): RouteInterface[] $routeCallable */
-                $routeCallable = static function () use (&$routes) {
-                    return $routes;
-                };
+            /** @var \Closure(): RouteInterface[] $routeCallable */
+            $routeCallable = static function () use (&$routes) {
+                return $routes;
+            };
 
-                $this->addDefinition($routerInterface, new Routing\RouterFactory($routeCallable), true);
-
-                $this->middleware[] = $routerInterface;
-            }
+            $this->addDefinition($routerInterface, new Routing\RouterFactory($routeCallable), true);
 
             $middleware = &$this->middleware;
 
             /** @var \Closure(): array<MiddlewareInterface|string> $stack */
-            $stack = static function () use (&$middleware) {
-                return $middleware;
+            $stack = static function () use (&$middleware, &$routes, $routerInterface) {
+                return [] !== $routes ? [...$middleware, $routerInterface] : $middleware;
             };
 
             $this->addDefinition(EmitterInterface::class, fn() => new SapiEmitter(), true)
