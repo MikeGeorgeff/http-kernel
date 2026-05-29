@@ -15,8 +15,6 @@ use Georgeff\HttpKernel\Routing\RouteInterface;
 
 final class HttpKernel extends Kernel implements HttpKernelInterface
 {
-    private bool $shutdown = false;
-
     private ?Profiler $requestProfile = null;
 
     /**
@@ -76,7 +74,7 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
      */
     private function throwIfShutdown(): void
     {
-        if ($this->shutdown) {
+        if ($this->isShutdown()) {
             throw new KernelException('Kernel is shutdown');
         }
     }
@@ -117,6 +115,10 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
         });
 
         parent::boot();
+
+        $this->onShutdown(function (): void {
+            $this->dispatchKernelEvent(new Event\KernelShutdown($this));
+        });
     }
 
     /**
@@ -262,20 +264,6 @@ final class HttpKernel extends Kernel implements HttpKernelInterface
         $this->middleware[] = $middleware;
 
         return $this;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function shutdown(): void
-    {
-        if (!$this->isBooted()) {
-            return;
-        }
-
-        $this->dispatchKernelEvent(new Event\KernelShutdown($this));
-
-        $this->shutdown = true;
     }
 
     /**

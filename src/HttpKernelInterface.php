@@ -50,11 +50,4 @@ interface HttpKernelInterface extends KernelInterface, RunnableKernelInterface, 
      * @return void
      */
     public function terminate(ServerRequestInterface $request, ResponseInterface $response): void;
-
-    /**
-     * Shutdown the kernel
-     *
-     * @return void
-     */
-    public function shutdown(): void;
 }
